@@ -7,6 +7,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 import joblib
 import numpy as np
+from decimal import Decimal  # Use Decimal instead of float
 
 # Load dataset
 df = pd.read_csv("C://Users//ANJALI//FraudDetectionGeneration//fraud_dataset.csv")
@@ -51,14 +52,13 @@ joblib.dump(scaler, "scaler.pkl", compress=3)
 # FastAPI app
 app = FastAPI()
 
-# Input schema for API with validation
 class TransactionInput(BaseModel):
-    debitor_balance: float = Field(..., gt=0, description="Debitor account balance, must be > 0")
-    creditor_balance: float = Field(..., gt=0, description="Creditor account balance, must be > 0")
-    amount: float = Field(..., gt=0, description="Amount being transferred, must be > 0")
+    debitor_balance: Decimal = Field(..., gt=0, description="Debitor account balance, must be > 0")
+    creditor_balance: Decimal = Field(..., gt=0, description="Creditor account balance, must be > 0")
+    amount: Decimal = Field(..., gt=0, description="Amount being transferred, must be > 0")
     debitor_txn_history: int = Field(..., ge=0, description="Number of past transactions by debitor")
     creditor_txn_history: int = Field(..., ge=0, description="Number of past transactions by creditor")
-    debitor_avg_txn: float = Field(..., ge=0, description="Average transaction amount of debitor")
+    debitor_avg_txn: Decimal = Field(..., ge=0, description="Average transaction amount of debitor")
 
 @app.get("/")
 def home():
@@ -71,8 +71,12 @@ def predict_fraud(transaction: TransactionInput):
         model = joblib.load("fraud_model.pkl")
         scaler = joblib.load("scaler.pkl")
 
+        # Convert Decimal values to float
+        transaction_dict = transaction.model_dump()
+        transaction_dict = {k: float(v) if isinstance(v, Decimal) else v for k, v in transaction_dict.items()}
+
         # Convert input data to DataFrame
-        input_data = pd.DataFrame([transaction.dict()])
+        input_data = pd.DataFrame([transaction_dict])
 
         # Generate new features
         input_data["transaction_ratio"] = input_data["amount"] / (input_data["debitor_avg_txn"] + 1)
